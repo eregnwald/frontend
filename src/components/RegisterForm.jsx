@@ -77,7 +77,7 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
     if (!validate()) return;
 
     try {
-      const response = await axios.post('http://localhost:3000/users', formData);
+      const response = await axios.post('https://5.35.86.252:3000/users', formData);
       onRegisterSuccess(response.data);
     } catch (err) {
       const errorMessage =

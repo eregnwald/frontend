@@ -20,7 +20,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://5.35.86.252:3000';
+
 
 export const ContactsPage = () => {
   const [contacts, setContacts] = useState([]);

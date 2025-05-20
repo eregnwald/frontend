@@ -18,7 +18,7 @@ import {
   Button,
 } from '@mui/material';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://5.35.86.252:3000';
 
 export const OpportunityForm = ({ opportunity = null, onSubmit, onCancel, open }) => {
   const [formData, setFormData] = useState({

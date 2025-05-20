@@ -8,7 +8,7 @@ function ContactsList () {
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/contacts');
+        const response = await axios.get('https://5.35.86.252:3000/contacts');
         setContacts(response.data);
       } catch (error) {
         console.error('Error fetching contacts:', error);

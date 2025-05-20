@@ -48,7 +48,7 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
     if (!validate()) return;
 
     try {
-      const response = await axios.post('http://localhost:3000/auth/login', formData);
+      const response = await axios.post('https://5.35.86.252:3000/auth/login', formData);
       localStorage.setItem('token', response.data.access_token); // сохраняем токен
       onLoginSuccess();
     } catch (err) {

@@ -23,7 +23,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://5.35.86.252:3000';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
