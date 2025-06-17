@@ -9,7 +9,6 @@ export const PrivateRoute = ({ children, roles = [] }) => {
   if (loading) return <p>Загрузка...</p>;
   if (!user) return <Navigate to="/login" />;
   
-  // Если требуется конкретная роль
   if (roles.length && !roles.some(role => user.roles.includes(role))) {
     return <Navigate to="/" />;
   }

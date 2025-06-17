@@ -1,8 +1,11 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom'; 
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PeopleIcon from '@mui/icons-material/People';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
@@ -21,13 +24,86 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import LoginIcon from '@mui/icons-material/Login';
 import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
 
-import { useAuth } from '../context/AuthContext'; // замените на ваш путь
+import apiClient from '../services/apiClient';
+import { useAuth } from '../context/AuthContext';
+import { jwtDecode } from 'jwt-decode';
 
 const drawerWidth = 260;
+
+
+const badgeStyle = {
+  marginLeft: 'auto',
+  padding: '4px 8px',
+  borderRadius: '50%',
+  backgroundColor: '#d32f2f',
+  color: '#fff',
+  fontSize: '0.75rem',
+  fontWeight: 'bold',
+};
+
+
+const menuItemStyle = (theme, active = false) => ({
+  borderRadius: '8px',
+  margin: '4px 8px',
+  backgroundColor: active
+    ? theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.1)'
+      : 'rgba(0,0,0,0.08)'
+    : 'transparent',
+  color: active ? theme.palette.primary.main : 'inherit',
+  fontWeight: active ? 'bold' : 'normal',
+  transition: 'all 0.2s ease-in-out',
+  '&:hover': {
+    backgroundColor: theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.1)'
+      : 'rgba(0,0,0,0.05)',
+  },
+});
 
 const SideBar = () => {
   const theme = useTheme();
   const { user, logout } = useAuth();
+  const location = useLocation(); 
+
+  const [overdueCount, setOverdueCount] = useState(0);
+  const [isManagerRole, setIsManagerRole] = useState(false);
+  const [isAdminRole, setIsAdminRole] = useState(false);
+
+  const isActive = (path) => location.pathname === path;
+  const isPathActive = (basePath) => location.pathname.startsWith(basePath); 
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      if (!user) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const decoded = jwtDecode(token);
+        const roles = decoded?.roles || [];
+
+        setIsManagerRole(roles.includes('manager'));
+        setIsAdminRole(roles.includes('admin'));
+
+        const response = await apiClient.get(`${process.env.REACT_APP_API_URL}/tasks/overdue/count`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setOverdueCount(response.data.count || 0);
+
+      } catch (error) {
+        console.error('Ошибка загрузки данных:', error.message);
+      }
+    };
+
+    fetchInitialData();
+
+    const intervalId = setInterval(fetchInitialData, 10 * 1000);
+    return () => clearInterval(intervalId);
+  }, [user]);
 
   return (
     <Drawer
@@ -69,56 +145,118 @@ const SideBar = () => {
         }}
       />
 
-      <List
-        sx={{
-          '& a': {
-            color: '#000',
-            textDecoration: 'none',
-          },
-        }}
-      >
-        <ListItem component={Link} to="/" button sx={menuItemStyle(theme)}>
-          <ListItemIcon sx={{ color: 'inherit' }}>
-            <InboxIcon />
-          </ListItemIcon>
-          <ListItemText primary="Главная" />
-        </ListItem>
+
+      <List>
+       
 
         {user && (
           <>
-            <ListItem component={Link} to="/users" button sx={menuItemStyle(theme)}>
-              <ListItemIcon sx={{ color: 'inherit' }}>
-                <PeopleAltIcon />
-              </ListItemIcon>
-              <ListItemText primary="Пользователи" />
-            </ListItem>
-            <ListItem component={Link} to="/profile" button sx={menuItemStyle(theme)}>
+            {isAdminRole && (
+              <ListItem
+                component={Link}
+                to="/users"
+                button
+                sx={(theme) => menuItemStyle(theme, isActive('/users'))}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  <PeopleAltIcon />
+                </ListItemIcon>
+                <ListItemText primary="Пользователи" />
+              </ListItem>
+            )}
+
+            <ListItem
+              component={Link}
+              to="/profile"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/profile'))}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
                 <PersonIcon />
               </ListItemIcon>
               <ListItemText primary="Профиль" />
             </ListItem>
-            <ListItem component={Link} to="/contacts" button sx={menuItemStyle(theme)}>
+
+            <ListItem
+              component={Link}
+              to="/contacts"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/contacts'))}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
-                <BusinessIcon />
+                <PeopleIcon />
               </ListItemIcon>
               <ListItemText primary="Клиенты" />
             </ListItem>
-            
-            <ListItem component={Link} to="/opportunities" button sx={menuItemStyle(theme)}>
+
+            <ListItem
+              component={Link}
+              to="/accounts"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/accounts'))}
+            >
+              <ListItemIcon sx={{ color: 'inherit' }}>
+                <BusinessIcon />
+              </ListItemIcon>
+              <ListItemText primary="Компании" />
+            </ListItem>
+
+            <ListItem
+              component={Link}
+              to="/funnels/shared"
+              button
+              sx={(theme) => menuItemStyle(theme, isPathActive('/funnels'))}
+            >
+              <ListItemIcon sx={{ color: 'inherit' }}>
+                <FilterAltIcon />
+              </ListItemIcon>
+              <ListItemText primary="Воронка продаж" />
+            </ListItem>
+
+            {isManagerRole && (
+              <ListItem
+                component={Link}
+                to="/report"
+                button
+                sx={(theme) => menuItemStyle(theme, isActive('/report'))}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  <AnalyticsIcon />
+                </ListItemIcon>
+                <ListItemText primary="Аналитика" />
+              </ListItem>
+            )}
+
+            <ListItem
+              component={Link}
+              to="/opportunities"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/opportunities'))}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
                 <WorkIcon />
               </ListItemIcon>
               <ListItemText primary="Сделки" />
             </ListItem>
-            <ListItem component={Link} to="/tasks" button sx={menuItemStyle(theme)}>
+
+            <ListItem
+              component={Link}
+              to="/tasks"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/tasks'))}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
                 <AssignmentIcon />
               </ListItemIcon>
               <ListItemText primary="Задачи" />
+              {overdueCount > 0 && <span style={badgeStyle}>{overdueCount}</span>}
             </ListItem>
-            
-            <ListItem button onClick={logout} sx={menuItemStyle(theme)}>
+
+            <ListItem
+              button
+              onClick={logout}
+              sx={(theme) => menuItemStyle(theme, false)}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
                 <ExitToAppIcon />
               </ListItemIcon>
@@ -130,17 +268,16 @@ const SideBar = () => {
         {!user && (
           <>
             <Divider sx={{ my: 1 }} />
-            <ListItem component={Link} to="/login" button sx={menuItemStyle(theme)}>
+            <ListItem
+              component={Link}
+              to="/login"
+              button
+              sx={(theme) => menuItemStyle(theme, isActive('/login'))}
+            >
               <ListItemIcon sx={{ color: 'inherit' }}>
                 <LoginIcon />
               </ListItemIcon>
               <ListItemText primary="Войти" />
-            </ListItem>
-            <ListItem component={Link} to="/register" button sx={menuItemStyle(theme)}>
-              <ListItemIcon sx={{ color: 'inherit' }}>
-                <AppRegistrationIcon />
-              </ListItemIcon>
-              <ListItemText primary="Регистрация" />
             </ListItem>
           </>
         )}
@@ -148,15 +285,5 @@ const SideBar = () => {
     </Drawer>
   );
 };
-
-// Стили для элементов меню
-const menuItemStyle = (theme) => ({
-  borderRadius: '8px',
-  margin: '4px 8px',
-  transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-  },
-});
 
 export default SideBar;

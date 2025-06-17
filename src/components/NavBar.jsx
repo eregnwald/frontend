@@ -10,10 +10,9 @@ export const NavBar = () => {
   return (
     <nav className="navbar">
       <div className="navbar-inner">
-        {/* Логотип или иконка */}
+
         <div className="navbar-logo">CRM</div>
 
-        {/* Навигационные ссылки */}
         <ul className="navbar-list">
           <li>
             <Link to="/" className="navbar-link" title="Главная">
@@ -35,6 +34,10 @@ export const NavBar = () => {
               <li>
                 <Link to="/contacts" className="navbar-link" title="Клиенты">
                   📞
+                </Link>
+              </li>
+              <li>
+                <Link to="/accounts" classname="navbar-link" title="Компании">
                 </Link>
               </li>
               {user.roles?.includes('admin') && (

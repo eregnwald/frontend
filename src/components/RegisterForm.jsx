@@ -1,24 +1,36 @@
-// src/components/RegisterForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextField,
   Button,
   Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
 } from '@mui/material';
+import apiClient from '../services/apiClient';
 
-import axios from 'axios';
-import Box from '@mui/material/Box'; 
+const RegisterForm = ({
+  onSwitchToLogin,
+  onRegisterSuccess,
+  onUpdateSuccess,
+  initialData = null, 
+}) => {
+  const isEditMode = !!initialData; 
 
-const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    first_name: '',
-    last_name: '',
+    username: initialData?.username || '',
+    email: initialData?.email || '',
+    password: '', 
+    roleId: initialData?.role?.role_id || '',
   });
 
+  const [roles, setRoles] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  const API_URL = process.env.REACT_APP_API_URL;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,23 +55,15 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
     if (!formData.email.trim()) {
       newErrors.email = 'Email обязателен';
       isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Некорректный формат email';
-      isValid = false;
     }
 
-    if (!formData.password || formData.password.length < 6) {
+    if (!isEditMode && (!formData.password || formData.password.length < 6)) {
       newErrors.password = 'Пароль должен быть не менее 6 символов';
       isValid = false;
     }
 
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = 'Имя обязательно';
-      isValid = false;
-    }
-
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Фамилия обязательна';
+    if (!formData.roleId) {
+      newErrors.roleId = 'Выберите роль';
       isValid = false;
     }
 
@@ -70,6 +74,23 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
     return isValid;
   };
 
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await apiClient.get(`${API_URL}/roles`);
+        setRoles(response.data);
+      } catch (err) {
+        const errorMessage =
+          err.response?.data?.message || 'Не удалось загрузить роли';
+        setMessage({ type: 'error', text: errorMessage });
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    fetchRoles();
+  }, [API_URL]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({});
@@ -77,12 +98,38 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
     if (!validate()) return;
 
     try {
-      const response = await axios.post('https://5.35.86.252:3000/users', formData);
-      onRegisterSuccess(response.data);
+      const payload = {
+        ...formData,
+        role_id: parseInt(formData.roleId, 10),
+      };
+
+      let response;
+
+      if (isEditMode) {
+
+        const changedFields = {};
+
+        Object.keys(payload).forEach((key) => {
+          if (
+            payload[key] !== initialData[key] ||
+            (typeof payload[key] === 'number' && payload[key] > 0)
+          ) {
+            changedFields[key] = payload[key];
+          }
+        });
+
+        if (!changedFields.password) delete changedFields.password;
+
+        response = await apiClient.patch(`${API_URL}/users/${initialData.user_id}`, changedFields);
+        onUpdateSuccess?.(response.data);
+      } else {
+        response = await apiClient.post(`${API_URL}/users`, payload);
+        onRegisterSuccess?.(response.data);
+      }
     } catch (err) {
       const errorMessage =
         err.response?.data?.message ||
-        'Ошибка регистрации. Попробуйте снова.';
+        (isEditMode ? 'Ошибка обновления данных' : 'Ошибка регистрации');
       setMessage({ type: 'error', text: errorMessage });
     }
   };
@@ -120,50 +167,61 @@ const RegisterForm = ({ onSwitchToLogin, onRegisterSuccess }) => {
           required
         />
 
-        <TextField
-          label="Пароль"
-          name="password"
-          type="password"
-          value={formData.password}
-          onChange={handleChange}
-          fullWidth
-          margin="normal"
-          variant="outlined"
-          size="small"
-          required
-        />
+        {!isEditMode && (
+          <TextField
+            label="Пароль"
+            name="password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            fullWidth
+            margin="normal"
+            variant="outlined"
+            size="small"
+            required
+          />
+        )}
 
-        <TextField
-          label="Имя"
-          name="first_name"
-          value={formData.first_name}
-          onChange={handleChange}
-          fullWidth
-          margin="normal"
-          variant="outlined"
-          size="small"
-        />
-
-        <TextField
-          label="Фамилия"
-          name="last_name"
-          value={formData.last_name}
-          onChange={handleChange}
-          fullWidth
-          margin="normal"
-          variant="outlined"
-          size="small"
-        />
+        <FormControl fullWidth margin="normal" variant="outlined" size="small">
+          <InputLabel id="role-label">Роль</InputLabel>
+          <Select
+            labelId="role-label"
+            id="role"
+            name="roleId"
+            value={formData.roleId}
+            onChange={handleChange}
+            label="Роль"
+            disabled={loadingRoles}
+          >
+            {loadingRoles ? (
+              <MenuItem value="">
+                <em>Загрузка...</em>
+              </MenuItem>
+            ) : roles.length === 0 ? (
+              <MenuItem value="">
+                <em>Нет доступных ролей</em>
+              </MenuItem>
+            ) : (
+              roles.map((role) => (
+                <MenuItem key={role.role_id} value={role.role_id}>
+                  {role.role_name}
+                </MenuItem>
+              ))
+            )}
+          </Select>
+        </FormControl>
 
         <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>
-          Зарегистрироваться
+          {isEditMode ? 'Сохранить изменения' : 'Зарегистрироваться'}
         </Button>
 
-        <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Button size="small" color="secondary" onClick={onSwitchToLogin}>
-            Уже есть аккаунт? Войти
-          </Button>
-        </Box>
+        {!isEditMode && (
+          <Box sx={{ textAlign: 'center', mt: 2 }}>
+            <Button size="small" color="primary" onClick={onSwitchToLogin}>
+              Уже есть аккаунт? Войти
+            </Button>
+          </Box>
+        )}
       </form>
     </>
   );

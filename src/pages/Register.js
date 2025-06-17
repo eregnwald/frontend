@@ -19,7 +19,7 @@ function Register() {
         email,
       });
       console.log('User registered:', response.data);
-      // Перенаправить на страницу входа
+   
       window.location.href = '/login';
     } catch (error) {
       setError(error.response?.data?.message || 'Registration failed');

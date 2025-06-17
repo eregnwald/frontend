@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
+import apiClient from '../services/apiClient';
 import {
   Container,
   Typography,
@@ -18,15 +19,13 @@ import {
   Link as MuiLink,
 } from '@mui/material';
 
-const API_URL = 'https://5.35.86.252:3000';
+const API_URL = process.env.REACT_APP_API_URL;
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const [userData, setUserData] = useState(null);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
     username: '',
     email: '',
   });
@@ -34,7 +33,7 @@ export default function ProfilePage() {
 
   const userId = user?.sub;
 
-  // Загрузка данных
+ 
   useEffect(() => {
     if (!userId) {
       setLoading(false);
@@ -43,21 +42,17 @@ export default function ProfilePage() {
 
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(`${API_URL}/users/${userId}`);
-        setUserData(response.data);
+        const response = await apiClient.get(`${API_URL}/users/${userId}`);
+        const data = response.data;
+        setUserData(data);
         setFormData({
-          first_name: response.data.first_name || '',
-          last_name: response.data.last_name || '',
-          username: response.data.username || '',
-          email: response.data.email || '',
+          username: data.username || '',
+          email: data.email || '',
         });
       } catch (error) {
         console.error('Ошибка загрузки профиля:', error);
-        setUserData(user);
         setFormData({
-          first_name: user.first_name || '',
-          last_name: user.last_name || '',
-          username: user.username || '', // если есть в токене
+          username: user.username || '', 
           email: user.email || '',
         });
       } finally {
@@ -79,7 +74,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     try {
-      const response = await axios.patch(`${API_URL}/users/${userId}`, formData);
+      const response = await apiClient.patch(`${API_URL}/users/${userId}`, formData);
       setUserData(response.data);
       setEditing(false);
     } catch (error) {
@@ -106,7 +101,6 @@ export default function ProfilePage() {
 
   const displayData = userData || user;
 
-  // Получаем список ролей
   const rolesList =
     displayData.userRoles?.map((ur) => ur.role?.role_name).filter(Boolean) || [];
 
@@ -115,37 +109,11 @@ export default function ProfilePage() {
       <Card elevation={6} sx={{ borderRadius: 2, overflow: 'hidden', backgroundColor: '#f9f9f9' }}>
         <CardContent>
           <Box textAlign="center" mb={3}>
-            <Avatar
-              alt={`${displayData.first_name} ${displayData.last_name}`}
-              src={`https://placehold.co/100x100 `}
-              sx={{ width: 100, height: 100, margin: 'auto', mb: 2 }}
-            />
+            
             <Typography variant="h5" component="div">
-              {editing ? (
-                <>
-                  <TextField
-                    name="first_name"
-                    value={formData.first_name}
-                    onChange={handleChange}
-                    size="small"
-                    fullWidth
-                    label="Имя"
-                    sx={{ mb: 1 }}
-                  />
-                  <TextField
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleChange}
-                    size="small"
-                    fullWidth
-                    label="Фамилия"
-                    sx={{ mb: 1 }}
-                  />
-                </>
-              ) : (
-                `${displayData.first_name || ''} ${displayData.last_name || ''}`.trim() ||
-                '—'
-              )}
+              {displayData.first_name && displayData.last_name
+                ? `${displayData.first_name} ${displayData.last_name}`
+                : displayData.username || '—'}
             </Typography>
           </Box>
 
@@ -153,7 +121,7 @@ export default function ProfilePage() {
             {/* Email */}
             <ListItem>
               <ListItemText
-                primary="Email"
+                primary="Login"
                 secondary={
                   editing ? (
                     <TextField
@@ -164,7 +132,7 @@ export default function ProfilePage() {
                       fullWidth
                     />
                   ) : (
-                    displayData.email
+                    displayData.email || '—'
                   )
                 }
               />
@@ -174,7 +142,7 @@ export default function ProfilePage() {
             {/* Username */}
             <ListItem>
               <ListItemText
-                primary="Username"
+                primary="Имя  "
                 secondary={
                   editing ? (
                     <TextField
@@ -193,18 +161,9 @@ export default function ProfilePage() {
             <Divider />
 
             {/* Роли */}
-            <ListItem>
-              <ListItemText
-                primary="Роль"
-                secondary={rolesList.length > 0 ? rolesList.join(', ') : 'Нет назначения'}
-              />
-            </ListItem>
-            <Divider />
+           
+            
 
-            {/* ID пользователя */}
-            <ListItem>
-              <ListItemText primary="ID пользователя" secondary={userId} />
-            </ListItem>
           </List>
 
           {/* Кнопки */}
@@ -244,4 +203,4 @@ export default function ProfilePage() {
       </Card>
     </Container>
   );
-}
+};

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Box, TextField, Button, Typography } from '@mui/material';
-
+import apiClient from '../services/apiClient';
 function CreateAccount() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -11,12 +11,12 @@ function CreateAccount() {
     e.preventDefault();
 
     try {
-      const response = await axios.post('/api/accounts', {
+      const response = await apiClient.post('/api/accounts', {
         name,
         email,
       });
       console.log('Account created:', response.data);
-      // Перенаправить на список аккаунтов
+
       window.location.href = '/accounts';
     } catch (error) {
       console.error('Error creating account:', error);

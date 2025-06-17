@@ -1,15 +1,14 @@
-// src/pages/RegisterPage.jsx
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../services/apiClient';
+const API_URL = process.env.REACT_APP_API_URL;
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    first_name: '',
-    last_name: '',
   });
 
   const [error, setError] = useState('');
@@ -26,8 +25,9 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:3000/users', formData);
-      navigate('/users'); // перейти к списку пользователей
+      
+      await apiClient.post(`${API_URL}/users`, formData);
+      navigate('/users'); 
     } catch (err) {
       setError('Ошибка при регистрации');
       console.error(err);
@@ -54,15 +54,7 @@ const RegisterPage = () => {
           <input type="password" name="password" onChange={handleChange} required />
         </div>
 
-        <div>
-          <label>Имя:</label>
-          <input type="text" name="first_name" onChange={handleChange} />
-        </div>
-
-        <div>
-          <label>Фамилия:</label>
-          <input type="text" name="last_name" onChange={handleChange} />
-        </div>
+        
 
         <button type="submit">Зарегистрировать</button>
       </form>

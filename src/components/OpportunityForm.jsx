@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-
+import apiClient from '../services/apiClient';
 import {
   Dialog,
   DialogTitle,
@@ -17,95 +17,190 @@ import {
   FormControlLabel,
   Button,
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
 
-const API_URL = 'https://5.35.86.252:3000';
+const SHARED_FUNNEL_ID = 25;
 
-export const OpportunityForm = ({ opportunity = null, onSubmit, onCancel, open }) => {
+export default function OpportunityForm({ opportunity = null, open, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
     opportunity_name: '',
     amount: '',
     close_date: new Date(),
     contact_id: '',
     owner_id: '',
+    stage_id: '',
+    account_id: '',
+    funnel_id: SHARED_FUNNEL_ID,
     is_closed: false,
   });
-
+  const [stages, setStages] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [users, setUsers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
 
-  // Загрузка данных
+  const API_URL = process.env.REACT_APP_API_URL;
+  const token = localStorage.getItem('token');
+
   useEffect(() => {
+    if (!open) return;
+    const loadSharedStages = async () => {
+      try {
+        if (!token) throw new Error('Токен отсутствует');
+        const stagesRes = await apiClient.get(`${API_URL}/funnels/${SHARED_FUNNEL_ID}/stages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const sharedStages = stagesRes.data || [];
+        setStages(sharedStages);
+      } catch (err) {
+        console.error('Не удалось загрузить этапы общей воронки:', err);
+        setStages([]);
+      }
+    };
+    loadSharedStages();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const fetchData = async () => {
       try {
-        const [contactsRes, usersRes] = await Promise.all([
-          axios.get(`${API_URL}/contacts`),
-          axios.get(`${API_URL}/users`),
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('Токен отсутствует');
+
+        const [contactsRes, usersRes, accountsRes] = await Promise.all([
+          apiClient.get(`${API_URL}/contacts`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          apiClient.get(`${API_URL}/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          apiClient.get(`${API_URL}/accounts`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         setContacts(contactsRes.data || []);
         setUsers(usersRes.data || []);
+        setAccounts(accountsRes.data || []);
+
+        const decoded = parseJwt(token);
+        const userId = decoded?.sub;
+        const userRoles = decoded?.roles || [];
+        const isUserRoleUser = userRoles.includes('user');
+
+        if (userId && !opportunity) {
+          setFormData((prev) => ({
+            ...prev,
+            owner_id: isUserRoleUser ? userId : prev.owner_id,
+          }));
+        }
+
+        if (opportunity) {
+          setFormData({
+            opportunity_name: opportunity.opportunity_name || '',
+            amount: opportunity.amount ? parseFloat(opportunity.amount).toFixed(0) : '',
+            close_date: opportunity.close_date ? new Date(opportunity.close_date) : new Date(),
+            contact_id: opportunity.contact_id || '',
+            owner_id: opportunity.owner_id || '',
+            stage_id: opportunity.stage_id || '',
+            account_id: opportunity.account_id || '',
+            funnel_id: SHARED_FUNNEL_ID,
+            is_closed: opportunity.is_closed || false,
+          });
+        }
       } catch (err) {
         console.error('Ошибка загрузки данных:', err);
       }
     };
-
     fetchData();
-  }, []);
-
-  // Предзаполнение формы при редактировании
-  useEffect(() => {
-    if (opportunity && open) {
-      setFormData({
-        opportunity_name: opportunity.opportunity_name || '',
-        amount: opportunity.amount?.toString() || '',
-        close_date: opportunity.close_date ? new Date(opportunity.close_date) : new Date(),
-        contact_id: opportunity.contact?.contact_id || '',
-        owner_id: opportunity.owner?.user_id || '',
-        is_closed: opportunity.is_closed || false,
-      });
-    } else {
-      setFormData({
-        opportunity_name: '',
-        amount: '',
-        close_date: new Date(),
-        contact_id: '',
-        owner_id: '',
-        is_closed: false,
-      });
-    }
-  }, [opportunity, open]);
+  }, [open, opportunity]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : name === 'amount' ? value.replace(/[^0-9.]/g, '') : value,
+      [name]: type === 'checkbox' ? checked : name === 'amount' ? value.replace(/[^0-9]/g, '') : value,
     }));
   };
 
-  const handleDateChange = (date) => {
-    setFormData((prev) => ({ ...prev, close_date: date }));
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const payload = {
       ...formData,
-      amount: parseFloat(formData.amount) || 0,
-      close_date: formData.close_date.toISOString().split('T')[0],
+      amount: parseFloat(formData.amount),
+      stage_id: parseInt(formData.stage_id),
+      contact_id: formData.contact_id || null,
+      owner_id: parseInt(formData.owner_id),
+      account_id: formData.account_id || null,
+      funnel_id: SHARED_FUNNEL_ID,
     };
 
-    onSubmit(payload);
+    try {
+      let res;
+      if (opportunity && opportunity.opportunity_id) {
+        res = await apiClient.patch(
+          `${API_URL}/opportunities/${opportunity.opportunity_id}`,
+          payload,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } else {
+        res = await apiClient.post(`${API_URL}/opportunities`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      onSubmit(res.data);
+
+    } catch (error) {
+      console.error('Ошибка при сохранении сделки:', error.response?.data || error.message);
+    } finally {
+      onClose();
+    }
   };
 
-  return (
-    <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle>{opportunity ? 'Редактировать сделку' : 'Добавить сделку'}</DialogTitle>
+  const handleClose = () => {
+    setFormData({
+      opportunity_name: '',
+      amount: '',
+      close_date: new Date(),
+      contact_id: '',
+      owner_id: '',
+      stage_id: '',
+      account_id: '',
+      funnel_id: SHARED_FUNNEL_ID,
+      is_closed: false,
+    });
+    onClose();
+  };
 
+  const parseJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window.atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Ошибка при парсинге токена', e);
+      return null;
+    }
+  };
+
+  const decodedToken = parseJwt(token);
+  const userRoles = decodedToken?.roles || [];
+  const isUserRoleUser = userRoles.includes('user');
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{opportunity ? 'Редактировать сделку' : 'Создать сделку'}</DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent dividers>
-          {/* Название сделки */}
           <TextField
             label="Название сделки"
             name="opportunity_name"
@@ -118,8 +213,30 @@ export const OpportunityForm = ({ opportunity = null, onSubmit, onCancel, open }
             size="small"
             autoFocus
           />
-
-          {/* Сумма */}
+          {!isUserRoleUser && (
+            <Autocomplete
+              options={users}
+              getOptionLabel={(option) =>
+                option.username || `${option.first_name} ${option.last_name}` || ''
+              }
+              value={users.find((u) => u.user_id === formData.owner_id) || null}
+              isOptionEqualToValue={(option, value) => option.user_id === value?.user_id}
+              onChange={(event, newValue) => {
+                const ownerId = newValue ? newValue.user_id : '';
+                setFormData((prev) => ({ ...prev, owner_id: ownerId }));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Ответственный"
+                  margin="normal"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                />
+              )}
+            />
+          )}
           <TextField
             label="Сумма"
             name="amount"
@@ -131,90 +248,81 @@ export const OpportunityForm = ({ opportunity = null, onSubmit, onCancel, open }
             size="small"
             placeholder="Введите сумму"
           />
-
-          {/* Дата закрытия */}
-          <div style={{ marginTop: '16px', marginBottom: '8px' }}>
-            <InputLabel shrink>Дата закрытия</InputLabel>
-            <DatePicker
-              selected={formData.close_date}
-              onChange={handleDateChange}
-              dateFormat="yyyy-MM-dd"
-              customInput={
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  value={formData.close_date.toLocaleDateString()}
-                  inputProps={{ readOnly: true }} // Добавляем readOnly
-                />
-              }
-            />
-          </div>
-
-          {/* Контакт */}
           <FormControl fullWidth margin="normal">
-            <InputLabel id="contact-label">Контакт</InputLabel>
+            <InputLabel id="stage-label">Этап</InputLabel>
             <Select
-              labelId="contact-label"
-              name="contact_id"
-              value={formData.contact_id || ''}
+              labelId="stage-label"
+              name="stage_id"
+              value={formData.stage_id || ''}
               onChange={handleChange}
-              label="Контакт"
+              label="Этап"
               size="small"
+              required
             >
-              <MenuItem value="">— Выберите контакт —</MenuItem>
-              {contacts.map((contact) => (
-                <MenuItem key={contact.contact_id} value={contact.contact_id}>
-                  {`${contact.first_name} ${contact.last_name}`}
+              <MenuItem value="">— Выберите этап —</MenuItem>
+              {stages.map((stage) => (
+                <MenuItem key={stage.stage_id} value={stage.stage_id}>
+                  {stage.stage_name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-
-          {/* Ответственный */}
-          <FormControl fullWidth margin="normal">
-            <InputLabel id="owner-label">Ответственный</InputLabel>
-            <Select
-              labelId="owner-label"
-              name="owner_id"
-              value={formData.owner_id || ''}
-              onChange={handleChange}
-              label="Ответственный"
-              size="small"
-            >
-              <MenuItem value="">— Выберите ответственного —</MenuItem>
-              {users.map((user) => (
-                <MenuItem key={user.user_id} value={user.user_id}>
-                  {user.username}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Чекбокс: is_closed */}
-          <FormControlLabel
-            control={
-              <Checkbox
-                name="is_closed"
-                checked={formData.is_closed}
-                onChange={handleChange}
-                color="primary"
-              />
+          <Autocomplete
+            options={contacts}
+            getOptionLabel={(option) =>
+              `${option.first_name || ''} ${option.last_name || ''}`.trim() || 'Без имени'
             }
-            label="Сделка закрыта"
-            sx={{ mt: 2 }}
+            isOptionEqualToValue={(option, value) => option.contact_id === value?.contact_id}
+            value={contacts.find((c) => c.contact_id === formData.contact_id) || null}
+            onChange={(event, newValue) => {
+              setFormData((prev) => ({
+                ...prev,
+                contact_id: newValue ? newValue.contact_id : '',
+              }));
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Контакт"
+                variant="outlined"
+                size="small"
+                fullWidth
+                margin="normal"
+              />
+            )}
+          />
+          <Autocomplete
+            options={accounts}
+            getOptionLabel={(option) => option.account_name || 'Без названия'}
+            isOptionEqualToValue={(option, value) => option.account_id === value?.account_id}
+            value={accounts.find((a) => a.account_id === formData.account_id) || null}
+            onChange={(event, newValue) => {
+              setFormData((prev) => ({
+                ...prev,
+                account_id: newValue ? newValue.account_id : '',
+              }));
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Компания"
+                variant="outlined"
+                size="small"
+                fullWidth
+                margin="normal"
+              />
+            )}
           />
         </DialogContent>
-
         <DialogActions>
-          <Button onClick={onCancel} color="secondary">
+          <Button onClick={handleClose} color="primary">
             Отмена
           </Button>
           <Button type="submit" variant="contained" color="primary">
-            {opportunity ? 'Обновить' : 'Создать'}
+            {opportunity ? 'Сохранить изменения' : 'Создать'}
           </Button>
         </DialogActions>
       </form>
     </Dialog>
   );
-};
+}

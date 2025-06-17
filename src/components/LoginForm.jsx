@@ -1,16 +1,13 @@
-// src/components/LoginForm.jsx
 import React, { useState } from 'react';
-import {
-  TextField,
-  Button,
-  Alert,
-} from '@mui/material';
-import axios from 'axios'; 
-import Box from '@mui/material/Box'; 
+import { TextField, Button, Alert } from '@mui/material';
+import Box from '@mui/material/Box';
+import apiClient from '../services/apiClient';
 
 const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  const API_URL = process.env.REACT_APP_API_URL;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -48,13 +45,16 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
     if (!validate()) return;
 
     try {
-      const response = await axios.post('https://5.35.86.252:3000/auth/login', formData);
-      localStorage.setItem('token', response.data.access_token); // сохраняем токен
+      const response = await apiClient.post(`${API_URL}/auth/login`, formData);
+      const { access_token, refresh_token } = response.data;
+
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+
       onLoginSuccess();
     } catch (err) {
       const errorMessage =
-        err.response?.data?.message ||
-        'Неверный логин или пароль';
+        err.response?.data?.message || 'Неверный логин или пароль';
       setMessage({ type: 'error', text: errorMessage });
     }
   };
@@ -69,7 +69,7 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
 
       <form onSubmit={handleSubmit}>
         <TextField
-          label="Email"
+          label="Логин"
           name="email"
           value={formData.email}
           onChange={handleChange}
@@ -97,11 +97,7 @@ const LoginForm = ({ onSwitchToRegister, onLoginSuccess }) => {
           Войти
         </Button>
 
-        <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Button size="small" color="secondary" onClick={onSwitchToRegister}>
-            Нет аккаунта? Зарегистрироваться
-          </Button>
-        </Box>
+        
       </form>
     </>
   );

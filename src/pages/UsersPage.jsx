@@ -1,6 +1,4 @@
-// src/pages/UsersPage.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import {
   Container,
   Typography,
@@ -11,31 +9,39 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Avatar,
   Box,
   Button,
   TextField,
   IconButton,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/material';
 
+import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
+import AddIcon from '@mui/icons-material/Add';
 
-const API_URL = 'https://5.35.86.252:3000';
+import RegisterForm from '../components/RegisterForm';
+import apiClient from '../services/apiClient';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [openModal, setOpenModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
 
-  // Загрузка пользователей
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(`${API_URL}/users`);
-        setUsers(response.data || []);
+        const res = await apiClient.get(`${API_URL}/users`);
+        setUsers(res.data || []);
       } catch (err) {
         console.error('Ошибка загрузки пользователей:', err);
       } finally {
@@ -46,27 +52,57 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
-  // Фильтрация по имени, фамилии, email или ID
+
   const filteredUsers = users.filter((user) =>
     `${user.first_name} ${user.last_name} ${user.email} ${user.user_id} ${user.username}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <Container>
-        <Box py={4}>
-          <Typography align="center">Загрузка пользователей...</Typography>
-        </Box>
-      </Container>
+  const handleOpenCreateModal = () => {
+    setEditingUser(null);
+    setOpenModal(true);
+  };
+
+  const handleOpenEditModal = (user) => {
+    setEditingUser(user);
+    setOpenModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setOpenModal(false);
+  };
+
+ 
+  const handleRegisterSuccess = (newUser) => {
+    setUsers((prev) => [...prev, newUser]);
+    handleCloseModal();
+  };
+
+  const handleUpdateSuccess = (updatedUser) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.user_id === updatedUser.user_id ? updatedUser : u))
     );
-  }
+    handleCloseModal();
+  };
+
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этого пользователя?')) return;
+
+    try {
+      await apiClient.delete(`${API_URL}/users/${userId}`);
+      setUsers((prev) => prev.filter((u) => u.user_id !== userId));
+    } catch (err) {
+      console.error('Ошибка при удалении:', err);
+      alert('Не удалось удалить пользователя');
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-        {/* Заголовок и поиск */}
+        {/* Поиск и заголовок */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h5" fontWeight="bold">
             Пользователи
@@ -85,16 +121,14 @@ export default function UsersPage() {
           />
         </Box>
 
-        {/* Таблица пользователей */}
+     
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Фото</TableCell>
                 <TableCell>ID</TableCell>
-                <TableCell>Имя</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Username</TableCell>
+                <TableCell>Имя пользователя</TableCell>
+                <TableCell>Логин</TableCell>
                 <TableCell>Роль</TableCell>
                 <TableCell align="right">Действия</TableCell>
               </TableRow>
@@ -102,41 +136,31 @@ export default function UsersPage() {
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={5} align="center">
                     Нет пользователей
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.user_id} hover>
-                    <TableCell>
-                      <Avatar
-                        alt={`${user.first_name} ${user.last_name}`}
-                        src={`https://placehold.co/100x100/gray/white?text= ${user.first_name?.[0] || 'U'}`}
-                        sx={{ bgcolor: 'primary.main' }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography>{user.user_id}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography fontWeight="bold">
-                        {user.first_name} {user.last_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.user_id}</TableCell>
                     <TableCell>{user.username || '—'}</TableCell>
-                    <TableCell>
-                      {user.userRoles?.map((ur) => ur.role?.role_name).filter(Boolean).join(', ') || 'Нет роли'}
-                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.role?.role_name || 'Нет роли'}</TableCell>
                     <TableCell align="right">
                       <Tooltip title="Редактировать">
-                        <IconButton color="primary" onClick={() => alert('Редактирование не реализовано')}>
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleOpenEditModal(user)}
+                        >
                           <EditIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Удалить">
-                        <IconButton color="error" onClick={() => alert('Удаление не реализовано')}>
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteUser(user.user_id)}
+                        >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
@@ -148,7 +172,7 @@ export default function UsersPage() {
           </Table>
         </TableContainer>
 
-        {/* Статистика */}
+      
         <Box mt={2} textAlign="center">
           <Typography variant="body2" color="textSecondary">
             Всего пользователей: {filteredUsers.length}
@@ -156,12 +180,32 @@ export default function UsersPage() {
         </Box>
       </Paper>
 
-      {/* Кнопка "Добавить" — если нужно */}
+     
       <Box mt={3} textAlign="right">
-        <Button variant="contained" color="primary" disabled>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={handleOpenCreateModal}
+        >
           Добавить пользователя
         </Button>
       </Box>
+
+      
+      <Dialog open={openModal} onClose={handleCloseModal} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {editingUser ? 'Редактировать пользователя' : 'Добавить пользователя'}
+        </DialogTitle>
+        <DialogContent>
+          <RegisterForm
+            initialData={editingUser || null}
+            onRegisterSuccess={handleRegisterSuccess}
+            onUpdateSuccess={handleUpdateSuccess}
+            onSwitchToLogin={() => {}}
+          />
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 }

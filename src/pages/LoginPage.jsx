@@ -1,4 +1,3 @@
-// src/pages/AuthPage.jsx
 import React, { useState } from 'react';
 import {
   Container,
@@ -19,11 +18,11 @@ export const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
 
   const handleLoginSuccess = () => {
-    window.location.href = '/'; // или useNavigate()
+    window.location.href = '/'; 
   };
 
   const handleRegisterSuccess = () => {
-    window.location.href = '/users'; // или useNavigate('/users')
+    window.location.href = '/users'; 
   };
 
   return (
@@ -37,14 +36,14 @@ export const LoginPage = () => {
         </Typography>
       </Box>
 
-      {/* Кнопка входа */}
+    
       <Box sx={{ display: 'flex', justifyContent: 'center' }}>
         <Button variant="contained" color="primary" onClick={() => setOpen(true)}>
           Войти
         </Button>
       </Box>
 
-      {/* Модальное окно */}
+     
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>{isLogin ? 'Вход' : 'Регистрация'}</DialogTitle>
         <DialogContent dividers>

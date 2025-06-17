@@ -23,8 +23,8 @@ import {
   Chip,
 } from '@mui/material';
 import { styled } from '@mui/system';
-
-const API_URL = 'https://5.35.86.252:3000';
+import apiClient from '../services/apiClient';
+const API_URL = process.env.REACT_APP_API_URL;
 
 
 const StyledCard = styled(Card)(({ theme }) => ({
@@ -36,7 +36,7 @@ const StyledCard = styled(Card)(({ theme }) => ({
   },
 }));
 
-// Карточка статистики
+
 const StatCard = ({ title, value, subtext, color = 'primary' }) => (
   <StyledCard>
     <CardContent sx={{ p: 3 }}>
@@ -58,11 +58,11 @@ export const DashboardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Загрузка задач
+
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await axios.get(`${API_URL}/tasks`);
+        const response = await apiClient.get(`${API_URL}/tasks`);
         setTasks(response.data);
         setLoading(false);
       } catch (err) {
@@ -91,28 +91,26 @@ export const DashboardPage = () => {
       </Box>
     );
 
-  // Вспомогательные данные
   const today = new Date();
   const upcomingTasks = tasks.filter((task) => {
     const taskDate = new Date(task.due_date);
     const diffTime = taskDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays <= 7; // задачи на ближайшие 7 дней
+    return diffDays >= 0 && diffDays <= 7; 
   });
 
   const overdueTasks = tasks.filter((task) => {
     const taskDate = new Date(task.due_date);
-    return taskDate < today; // просроченные задачи
+    return taskDate < today; 
   });
 
   return (
     <Container maxWidth="lg" sx={{ mt: 5, mb: 5 }}>
-      {/* Приветствие */}
+    
       <Typography variant="h4" gutterBottom fontWeight="bold">
         Добро пожаловать в CRM
       </Typography>
 
-      {/* Статистика */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard title="Всего задач" value={tasks.length} subtext="за всё время" color="primary" />
@@ -128,7 +126,6 @@ export const DashboardPage = () => {
         </Grid>
       </Grid>
 
-      {/* Таблица ближайших задач */}
 <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
   <Box sx={{ p: 3 }}>
     <Typography variant="h6" gutterBottom fontWeight="medium">

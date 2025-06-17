@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { AiFillEdit, AiFillDelete } from 'react-icons/ai'; // Иконки для редактирования и удаления
-
-function ContactsList () {
+import apiClient from '../services/apiClient';
+const ContactsList = () => {
   const [contacts, setContacts] = useState([]);
+
+  const API_URL = process.env.REACT_APP_API_URL; // Переменная окружения
 
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const response = await axios.get('https://5.35.86.252:3000/contacts');
+        const response = await apiClient.get(`${API_URL}/contacts`);
         setContacts(response.data);
       } catch (error) {
         console.error('Error fetching contacts:', error);
       }
     };
     fetchContacts();
-  }, []);
+  }, [API_URL]); // Зависимость от API_URL
 
   const handleEdit = (contactId) => {
     // Перейти на страницу редактирования контакта
@@ -24,7 +26,7 @@ function ContactsList () {
 
   const handleDelete = async (contactId) => {
     try {
-      await axios.delete(`/api/contacts/${contactId}`);
+      await apiClient.delete(`${API_URL}/contacts/${contactId}`);
       setContacts(contacts.filter((contact) => contact.contact_id !== contactId));
     } catch (error) {
       console.error('Error deleting contact:', error);
